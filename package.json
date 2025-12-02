@@ -1,11 +1,12 @@
 {
   "name": "bot-horario-pro",
   "version": "1.0.0",
-  "description": "Bot de Tempo RP",
+  "description": "Bot de tempo RP",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
-    "discord.js": "^14.25.1",
-    "http": "^0.0.1",
-    "fs": "^0.0.1"
+    "discord.js": "^14.x.x"
   }
 }
