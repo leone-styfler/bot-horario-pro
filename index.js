@@ -6,7 +6,6 @@ const http = require('http');
 let gameTime = null;
 let realTime = null;
 let rate = 1; 
-// 🆕 NOVA VARIÁVEL: Para garantir que o reset só ocorra uma vez por dia
 let lastResetDate = null; 
 
 // --- Carregamento de Dados ---
@@ -25,7 +24,6 @@ if (fs.existsSync('tempo.json')) {
         }
         
         rate = data.rate ?? 1;
-        // Carrega a data do último reset
         lastResetDate = data.lastResetDate ? new Date(data.lastResetDate) : null;
 
     } catch (e) {
@@ -40,7 +38,7 @@ function save() {
         gameTime: gameTime ? gameTime.toISOString() : null,
         realTime: realTime ? realTime.toISOString() : null,
         rate,
-        lastResetDate: lastResetDate ? lastResetDate.toISOString() : null // Salva a nova variável
+        lastResetDate: lastResetDate ? lastResetDate.toISOString() : null
     }));
 }
 
@@ -59,7 +57,6 @@ function getCurrentGameTime() {
     const diffGameMs = diffRealMs * rate; 
     const final = new Date(gameTime.getTime() + diffGameMs);
 
-    // Retorna HH:MM:SS
     return final.toTimeString().split(' ')[0];
 }
 
@@ -70,7 +67,7 @@ function updateStatus(client) {
     const resetHour = 5; // 5:00 da manhã, horário real
     const nowHour = now.getHours();
     
-    // Verifica se é hora do reset (entre 05:00:00 e 05:00:05)
+    // Verifica se é hora do reset (entre 05:00:00 e 05:00:59)
     if (nowHour === resetHour && now.getMinutes() === 0) {
         
         // Verifica se o reset já foi feito hoje
@@ -89,7 +86,6 @@ function updateStatus(client) {
             
             save();
             console.log(`[Automatic Reset] Horário do jogo forçado para 18:00. Próximo reset: amanhã às 05:00.`);
-            // A função continua e o status será atualizado imediatamente
         }
     }
     
@@ -117,7 +113,7 @@ client.on('ready', () => {
 });
 
 // --- Registro de Comandos (Usando Variáveis de Ambiente) ---
-// ... (Este bloco permanece inalterado) ...
+
 (async () => {
     try {
         const CLIENT_ID = process.env.CLIENT_ID; 
@@ -134,13 +130,14 @@ client.on('ready', () => {
             new SlashCommandBuilder().setName("sethora").setDescription("Define o horário atual do servidor RP").addStringOption(o => o.setName("hora").setDescription("Ex: 12:35").setRequired(true)),
             new SlashCommandBuilder().setName("atualizar").setDescription("Informa o novo horário para calcular a velocidade do tempo").addStringOption(o => o.setName("hora").setDescription("Ex: 12:40").setRequired(true)),
             new SlashCommandBuilder().setName("horaagora").setDescription("Mostra o horário atual do servidor RP"),
+            // 🔄 COMANDO MODIFICADO: A opção "nova_taxa" agora é obrigatória (true)
             new SlashCommandBuilder()
                 .setName("velocidade")
-                .setDescription("Mostra ou define a taxa de aceleração do tempo RP (Ex: 2.50x)")
+                .setDescription("Define a nova taxa de aceleração do tempo RP (Ex: 5.89).")
                 .addNumberOption(o => 
                     o.setName("nova_taxa")
-                     .setDescription("Opcional: A nova taxa de aceleração (Ex: 2.5 ou 0.5).")
-                     .setRequired(false) 
+                     .setDescription("A nova taxa de aceleração (Ex: 5.89 ou 0.5).")
+                     .setRequired(true) 
                 )
         ];
 
@@ -172,7 +169,6 @@ client.on('interactionCreate', async (interaction) => {
         gameTime = now;
         realTime = new Date();
         rate = 1;
-        // Reseta o lastResetDate para garantir que o reset diário ocorra
         lastResetDate = null;
         save();
         updateStatus(client); 
@@ -215,6 +211,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply(`🕒 Horário do servidor RP: **${currentTime}**`);
     }
     
+    // 🔄 TRATAMENTO DO COMANDO /velocidade (AGORA APENAS PARA DEFINIR)
     if (cmd === "velocidade") {
         const newRateInput = interaction.options.getNumber("nova_taxa"); 
 
@@ -222,28 +219,28 @@ client.on('interactionCreate', async (interaction) => {
              return interaction.reply({ content: "⚠️ O tempo de RP deve ser configurado primeiro com /sethora.", ephemeral: true });
         }
         
-        if (newRateInput !== null) {
-            if (newRateInput <= 0 || isNaN(newRateInput)) {
-                return interaction.reply({ content: "⚠️ Taxa inválida. Use um número positivo (Ex: 2.5).", ephemeral: true });
-            }
-
-            const oldRate = rate.toFixed(2);
-            rate = newRateInput;
-            
-            // Reajusta os pontos de partida para que o tempo continue de forma precisa com a nova taxa
-            const now = new Date();
-            const diffRealMs = now.getTime() - realTime.getTime();
-            const diffGameMs = diffRealMs * oldRate;
-            gameTime = new Date(gameTime.getTime() + diffGameMs); // Calcula o gameTime atual
-            realTime = now;
-            
-            save();
-            updateStatus(client); 
-
-            return interaction.reply(`🚀 Velocidade do Tempo RP alterada de **${oldRate}x** para **${rate.toFixed(2)}x**!`);
-        } else {
-            return interaction.reply(`🚀 Velocidade do Tempo RP atual: **${rate.toFixed(2)}x**`);
+        if (newRateInput <= 0 || isNaN(newRateInput)) {
+            return interaction.reply({ content: "⚠️ Taxa inválida. Use um número positivo (Ex: 2.5).", ephemeral: true });
         }
+
+        const oldRate = rate.toFixed(2);
+        
+        // 1. Calcula o gameTime atual antes de mudar a taxa
+        const now = new Date();
+        const diffRealMs = now.getTime() - realTime.getTime();
+        const diffGameMs = diffRealMs * rate; 
+        
+        // 2. Define o gameTime e realTime como novos pontos de referência
+        gameTime = new Date(gameTime.getTime() + diffGameMs); 
+        realTime = now;
+        
+        // 3. Aplica a nova taxa
+        rate = newRateInput;
+        
+        save();
+        updateStatus(client); 
+
+        return interaction.reply(`🚀 Velocidade do Tempo RP alterada de **${oldRate}x** para **${rate.toFixed(2)}x**!`);
     }
 });
 
