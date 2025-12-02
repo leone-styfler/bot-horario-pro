@@ -4,7 +4,7 @@
   "description": "Bot de Tempo RP",
   "main": "index.js",
   "dependencies": {
-    "discord.js": "^14.0.0",
+    "discord.js": "^14.25.1",
     "http": "^0.0.1",
     "fs": "^0.0.1"
   }
